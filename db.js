@@ -16,7 +16,13 @@ function ensureDataDir(dbPath) {
 
 const rawPath = config.database.path;
 const resolvedPath = rawPath.startsWith('/') ? rawPath : join(__dirname, rawPath);
-if (!resolvedPath.startsWith('/tmp')) {
+
+// Ephemeral paths (e.g. /tmp on Vercel) are wiped on restart — create/update/delete will not persist.
+const isEphemeral = resolvedPath.startsWith('/tmp');
+if (isEphemeral) {
+  console.warn('[db] Database path is ephemeral (%s). Data will be lost on restart. For production, set DATABASE_PATH to a persistent absolute path (e.g. a volume mount).', resolvedPath);
+}
+if (!isEphemeral) {
   ensureDataDir(resolvedPath);
 }
 
@@ -140,5 +146,8 @@ export function close() {
 }
 
 process.on('beforeExit', () => close());
+
+// Log where the database is stored (helps debug "data not persisting" on hosted deployments)
+console.log('[db] Database file:', resolvedPath);
 
 export default db;
