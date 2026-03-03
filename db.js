@@ -41,7 +41,8 @@ const SQL = await initSqlJs({
 });
 
 let db;
-if (existsSync(resolvedPath)) {
+const dbFileExisted = existsSync(resolvedPath);
+if (dbFileExisted) {
   const buffer = readFileSync(resolvedPath);
   db = new SQL.Database(buffer);
 } else {
@@ -126,9 +127,11 @@ try {
   save();
 } catch (_) {}
 
+// Only seed 3 default invites when the DB file did not exist (first-time setup).
+// Do not re-seed when the user has deleted all invites — that would make deleted links "recover".
 const countResult = db.exec('SELECT COUNT(*) AS n FROM invites');
 const count = countResult.length ? countResult[0].values[0][0] : 0;
-if (count === 0) {
+if (count === 0 && !dbFileExisted) {
   for (let i = 0; i < 3; i++) {
     db.run('INSERT INTO invites (invite_link, connections_status) VALUES (?, ?)', [generateInviteLink(), 0]);
   }
