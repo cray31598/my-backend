@@ -233,6 +233,7 @@ api.patch('/invites/:invite_link', (req, res) => {
   }
 });
 
+// Remove invite: hard delete from DB (row is removed, not updated).
 api.delete('/invites/:invite_link', (req, res) => {
   try {
     const { invite_link } = req.params;
