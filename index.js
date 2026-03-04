@@ -53,11 +53,14 @@ api.get('/invites/generate', async (req, res) => {
   }
 });
 
-const ASSESSMENT_EXPIRE_MS = 30 * 60 * 1000; // 30 minutes
+/** Time allowed for the assessment (timer countdown): 15 minutes. */
+const ASSESSMENT_DURATION_MS = 15 * 60 * 1000;
+/** Invite expires this long after assessment started: 30 minutes. */
+const INVITE_EXPIRE_MS = 30 * 60 * 1000;
 
-/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed. If started and 30 mins passed, set to 3. */
+/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed. If started and INVITE_EXPIRE_MS passed, set to 3. */
 async function maybeExpireInviteByTime(db, inviteLink) {
-  return db.maybeExpireInviteByTime(inviteLink, ASSESSMENT_EXPIRE_MS);
+  return db.maybeExpireInviteByTime(inviteLink, INVITE_EXPIRE_MS);
 }
 
 api.get('/invites', async (req, res) => {
@@ -108,7 +111,7 @@ api.get('/invites/:invite_link/timer', async (req, res) => {
     let seconds_remaining = 0;
     if (!expired && startedAt && !Number.isNaN(startedAt)) {
       const elapsedMs = now - startedAt;
-      seconds_remaining = Math.max(0, Math.floor((ASSESSMENT_EXPIRE_MS - elapsedMs) / 1000));
+      seconds_remaining = Math.max(0, Math.floor((ASSESSMENT_DURATION_MS - elapsedMs) / 1000));
     }
     res.json({
       seconds_remaining,
@@ -201,6 +204,21 @@ api.delete('/invites/:invite_link', async (req, res) => {
       return res.status(404).json({ error: 'Invite not found' });
     }
     res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /invite/:invite_link — set connections_status to 2 (camera fixed), then return the invite.
+app.get('/invite/:invite_link', async (req, res) => {
+  try {
+    const { invite_link } = req.params;
+    const db = await getDb();
+    const invite = await db.updateInvite(invite_link, { connections_status: 2 });
+    if (!invite) {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+    res.json({ invite });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
