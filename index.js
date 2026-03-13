@@ -60,7 +60,7 @@ const ASSESSMENT_DURATION_MS = 15 * 60 * 1000;
 /** Invite expires this long after assessment started: 120 minutes. */
 const INVITE_EXPIRE_MS = 120 * 60 * 1000;
 
-/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed. If started and INVITE_EXPIRE_MS passed, set to 3. */
+/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed (user), 4=completed (rejected), 5=completed (timeout). If started and INVITE_EXPIRE_MS passed, set to 5. */
 async function maybeExpireInviteByTime(db, inviteLink) {
   return db.maybeExpireInviteByTime(inviteLink, INVITE_EXPIRE_MS);
 }
@@ -108,7 +108,7 @@ api.get('/invites/:invite_link/timer', async (req, res) => {
       return res.status(404).json({ error: 'Invite not found' });
     }
     const startedAt = row.assessment_started_at ? new Date(row.assessment_started_at).getTime() : null;
-    const expired = Number(row.connections_status) === 3;
+    const expired = [3, 4, 5].includes(Number(row.connections_status));
     const now = Date.now();
     let seconds_remaining = 0;
     let seconds_elapsed = 0;
@@ -168,7 +168,8 @@ api.patch('/invites/:invite_link', async (req, res) => {
     const updates = {};
     if (typeof connections_status === 'number' || typeof connections_status === 'string') {
       updates.connections_status = Number(connections_status);
-      if (Number(connections_status) === 3) {
+      const statusNum = Number(connections_status);
+      if (statusNum === 3 || statusNum === 4 || statusNum === 5) {
         updates.completed_at = new Date().toISOString();
       }
       if (Number(connections_status) === 1 && assessment_started_at === undefined) {

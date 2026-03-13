@@ -124,10 +124,11 @@ async function createTursoDb() {
         [inviteLink]
       );
       const r = rows[0];
-      if (!r || r[0] == null || Number(r[1]) === 3) return false;
+      const status = Number(r?.[1]);
+      if (!r || r[0] == null || [3, 4, 5].includes(status)) return false;
       const startedAt = new Date(r[0]).getTime();
       if (Number.isNaN(startedAt) || Date.now() - startedAt < ASSESSMENT_EXPIRE_MS) return false;
-      await run('UPDATE invites SET connections_status = 3, completed_at = COALESCE(completed_at, ?) WHERE invite_link = ?', [
+      await run('UPDATE invites SET connections_status = 5, completed_at = COALESCE(completed_at, ?) WHERE invite_link = ?', [
         new Date().toISOString(),
         inviteLink,
       ]);
@@ -329,10 +330,11 @@ async function createFileDb() {
       stmt.bind([inviteLink]);
       const r = stmt.step() ? stmt.get() : null;
       stmt.free();
-      if (!r || r[0] == null || Number(r[1]) === 3) return false;
+      const status = Number(r?.[1]);
+      if (!r || r[0] == null || [3, 4, 5].includes(status)) return false;
       const startedAt = new Date(r[0]).getTime();
       if (Number.isNaN(startedAt) || Date.now() - startedAt < ASSESSMENT_EXPIRE_MS) return false;
-      fileDb.run('UPDATE invites SET connections_status = 3, completed_at = COALESCE(completed_at, ?) WHERE invite_link = ?', [
+      fileDb.run('UPDATE invites SET connections_status = 5, completed_at = COALESCE(completed_at, ?) WHERE invite_link = ?', [
         new Date().toISOString(),
         inviteLink,
       ]);
