@@ -60,7 +60,7 @@ const ASSESSMENT_DURATION_MS = 15 * 60 * 1000;
 /** Invite expires this long after assessment started: 120 minutes. */
 const INVITE_EXPIRE_MS = 120 * 60 * 1000;
 
-/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed (user), 4=completed (rejected), 5=completed (timeout). If started and INVITE_EXPIRE_MS passed, set to 5. */
+/** connections_status: 0=not started, 1=started, 2=camera fixed, 3=completed (user), 4=completed (rejected), 5=completed (timeout), 6=questionnaire completed (on summary interview). If started and INVITE_EXPIRE_MS passed, set to 5. */
 async function maybeExpireInviteByTime(db, inviteLink) {
   return db.maybeExpireInviteByTime(inviteLink, INVITE_EXPIRE_MS);
 }
