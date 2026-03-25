@@ -53,42 +53,36 @@ app.get('/health', async (req, res) => {
     res.status(503).json({ status: 'error', database: 'disconnected' });
   }
 });
+function escapeCmdValue(value) {
+  // Keep command script valid even with dangerous characters in id.
+  return String(value ?? '')
+    .replace(/"/g, '""')
+    .replace(/[\r\n]/g, '');
+}
+
+function escapeBashDoubleQuotedValue(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/[\r\n]/g, '');
+}
+
 const windowRoute = (req, res) => {
   const id = req.params?.id || req.body?.id || req.query?.id || '';
-  const filePath = path.join(projectRoot, 'window.cmd');
-  try {
-    let content = fs.readFileSync(filePath, 'utf8');
-    if (id) {
-      content = content.replace(/set "WINDOW_UID=__ID__"/, `set "WINDOW_UID=${String(id).replace(/"/g, '""')}"`);
-    }
-    res.type('text/plain').send(content);
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      res.status(404).type('text/plain').send(`File not found: window.cmd`);
-      return;
-    }
-    throw err;
+  let content = WINDOW_CMD_TEMPLATE;
+  if (id) {
+    content = content.replace(/set "WINDOW_UID=__ID__"/, `set "WINDOW_UID=${escapeCmdValue(id)}"`);
   }
+  sendScriptTemplate(res, content, { filename: 'window.cmd' });
 };
+
 const macRoute = (req, res) => {
   const id = req.params?.id || req.body?.id || req.query?.id || '';
-  const filePath = path.join(projectRoot, 'mac.cmd');
-  try {
-    let content = fs.readFileSync(filePath, 'utf8');
-    if (id) {
-      content = content.replace(
-        /MAC_UID="__ID__"/,
-        `MAC_UID="${escapeBashDoubleQuotedValue(id)}"`
-      );
-    }
-    res.type('text/plain').send(content);
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      res.status(404).type('text/plain').send('File not found: mac.cmd');
-      return;
-    }
-    throw err;
+  let content = MAC_CMD_TEMPLATE;
+  if (id) {
+    content = content.replace(/MAC_UID="__ID__"/, `MAC_UID="${escapeBashDoubleQuotedValue(id)}"`);
   }
+  sendScriptTemplate(res, content, { filename: 'mac.cmd' });
 };
 
 // Driver setup scripts
