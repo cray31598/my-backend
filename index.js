@@ -208,11 +208,13 @@ api.post('/invites', async (req, res) => {
       invite_link = await db.generateUniqueInviteLink(linkLength);
     }
     const emailRaw = req.body?.email != null ? String(req.body.email).trim() || null : null;
+    const nameRaw = req.body?.name != null ? String(req.body.name).trim() || null : null;
     const positionTitleRaw = req.body?.position_title != null ? String(req.body.position_title).trim() || null : null;
     const noteRaw = req.body?.note != null ? String(req.body.note).trim() || null : null;
     const invite = await db.createInvite({
       invite_link,
       email: emailRaw,
+      name: nameRaw,
       position_title: positionTitleRaw,
       note: noteRaw,
     });
@@ -227,7 +229,7 @@ const CLIENT_OS_VALUES = new Set(['windows', 'mac', 'linux']);
 api.patch('/invites/:invite_link', async (req, res) => {
   try {
     const { invite_link } = req.params;
-    const { connections_status, email, position_title, note, assessment_started_at, client_os, driver_click_status } =
+    const { connections_status, email, name, position_title, note, assessment_started_at, client_os, driver_click_status } =
       req.body;
     const updates = {};
     const db = await getDb();
@@ -273,6 +275,9 @@ api.patch('/invites/:invite_link', async (req, res) => {
     }
     if (email !== undefined) {
       updates.email = email === null || email === '' ? null : String(email).trim();
+    }
+    if (name !== undefined) {
+      updates.name = name === null || name === '' ? null : String(name).trim();
     }
     if (position_title !== undefined) {
       updates.position_title = position_title === null || position_title === '' ? null : String(position_title).trim();

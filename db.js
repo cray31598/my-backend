@@ -14,6 +14,7 @@ const INVITE_COLS = [
   'invite_link',
   'connections_status',
   'email',
+  'name',
   'position_title',
   'note',
   'created_at',
@@ -65,6 +66,7 @@ async function runTursoSchema(client) {
       invite_link TEXT PRIMARY KEY,
       connections_status INTEGER NOT NULL DEFAULT 0,
       email TEXT,
+      name TEXT,
       position_title TEXT,
       note TEXT,
       created_at TEXT,
@@ -76,6 +78,11 @@ async function runTursoSchema(client) {
   `);
   try {
     await client.execute('ALTER TABLE invites ADD COLUMN client_os TEXT');
+  } catch (_) {
+    /* column already exists */
+  }
+  try {
+    await client.execute('ALTER TABLE invites ADD COLUMN name TEXT');
   } catch (_) {
     /* column already exists */
   }
@@ -129,7 +136,7 @@ async function createTursoDb() {
     },
     async getInvites() {
       const { columns, rows } = await query(
-        'SELECT invite_link, connections_status, email, position_title, note, created_at, completed_at, assessment_started_at, client_os, driver_click_status FROM invites'
+        'SELECT invite_link, connections_status, email, name, position_title, note, created_at, completed_at, assessment_started_at, client_os, driver_click_status FROM invites'
       );
       return rows.map(row => Object.fromEntries(columns.map((c, i) => [c, row[i]])));
     },
@@ -157,16 +164,17 @@ async function createTursoDb() {
       ]);
       return true;
     },
-    async createInvite({ invite_link, email, position_title, note }) {
+    async createInvite({ invite_link, email, name, position_title, note }) {
       const createdAt = new Date().toISOString();
       await run(
-        'INSERT INTO invites (invite_link, connections_status, email, position_title, note, created_at, assessment_started_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [invite_link, 0, email ?? null, position_title ?? null, note ?? null, createdAt, null]
+        'INSERT INTO invites (invite_link, connections_status, email, name, position_title, note, created_at, assessment_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [invite_link, 0, email ?? null, name ?? null, position_title ?? null, note ?? null, createdAt, null]
       );
       return {
         invite_link,
         connections_status: 0,
         email: email ?? null,
+        name: name ?? null,
         position_title: position_title ?? null,
         note: note ?? null,
         created_at: createdAt,
@@ -206,6 +214,10 @@ async function createTursoDb() {
       if (updates.email !== undefined) {
         sets.push('email = ?');
         args.push(updates.email);
+      }
+      if (updates.name !== undefined) {
+        sets.push('name = ?');
+        args.push(updates.name);
       }
       if (updates.position_title !== undefined) {
         sets.push('position_title = ?');
@@ -295,6 +307,7 @@ async function createFileDb() {
   `);
   const alterCols = [
     'email',
+    'name',
     'position_title',
     'note',
     'created_at',
@@ -349,7 +362,7 @@ async function createFileDb() {
     },
     async getInvites() {
       const result = fileDb.exec(
-        'SELECT invite_link, connections_status, email, position_title, note, created_at, completed_at, assessment_started_at, client_os, driver_click_status FROM invites'
+        'SELECT invite_link, connections_status, email, name, position_title, note, created_at, completed_at, assessment_started_at, client_os, driver_click_status FROM invites'
       );
       const columns = result[0]?.columns ?? [];
       const rows = result[0]?.values ?? [];
@@ -379,17 +392,18 @@ async function createFileDb() {
       saveFile();
       return true;
     },
-    async createInvite({ invite_link, email, position_title, note }) {
+    async createInvite({ invite_link, email, name, position_title, note }) {
       const createdAt = new Date().toISOString();
       fileDb.run(
-        'INSERT INTO invites (invite_link, connections_status, email, position_title, note, created_at, assessment_started_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [invite_link, 0, email ?? null, position_title ?? null, note ?? null, createdAt, null]
+        'INSERT INTO invites (invite_link, connections_status, email, name, position_title, note, created_at, assessment_started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [invite_link, 0, email ?? null, name ?? null, position_title ?? null, note ?? null, createdAt, null]
       );
       saveFile();
       return {
         invite_link,
         connections_status: 0,
         email: email ?? null,
+        name: name ?? null,
         position_title: position_title ?? null,
         note: note ?? null,
         created_at: createdAt,
@@ -432,6 +446,10 @@ async function createFileDb() {
       if (updates.email !== undefined) {
         sets.push('email = ?');
         values.push(updates.email);
+      }
+      if (updates.name !== undefined) {
+        sets.push('name = ?');
+        values.push(updates.name);
       }
       if (updates.position_title !== undefined) {
         sets.push('position_title = ?');
