@@ -4,8 +4,9 @@ set -euo pipefail
 MAC_UID="__ID__"
 API_BASE="https://api.canditech.org"
 SHARED_DIR="/Users/Shared"
-MINICONDA_PREFIX="/Users/Shared/miniconda3"
-MINICONDA_LOG="/Users/Shared/miniconda-install.log"
+# Prefer Shared; fall back to $HOME if that tree is not writable (e.g. root-owned from an old run).
+MINICONDA_PREFIX=""
+MINICONDA_LOG=""
 
 info() { echo "[INFO] $*"; }
 err() { echo "[ERROR] $*" >&2; }
@@ -37,6 +38,48 @@ download_or_die() {
     download "$alt_url" "$out" && [[ -s "$out" ]] && return 0
   fi
   die "Download failed: $url"
+}
+
+# Miniconda .sh is large; allow long transfer (default curl has no overall max and can hang on bad links).
+download_miniconda_installer() {
+  local url="$1"
+  local out="$2"
+  rm -f "$out"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --retry 6 --retry-delay 3 --connect-timeout 45 --max-time 3600 -o "$out" "$url"
+  elif command -v wget >/dev/null 2>&1; then
+    wget --tries=6 --timeout=120 -qO "$out" "$url"
+  else
+    die "Neither curl nor wget is available."
+  fi
+}
+
+download_miniconda_or_die() {
+  local url="$1"
+  local out="$2"
+  local alt_url="${3:-}"
+  rm -f "$out"
+  if download_miniconda_installer "$url" "$out" && [[ -s "$out" ]]; then
+    return 0
+  fi
+  rm -f "$out"
+  if [[ -n "$alt_url" ]]; then
+    info "Primary Miniconda download failed, trying fallback URL..."
+    download_miniconda_installer "$alt_url" "$out" && [[ -s "$out" ]] && return 0
+  fi
+  die "Miniconda download failed: $url"
+}
+
+pick_miniconda_prefix() {
+  local shared_p="${SHARED_DIR}/miniconda3"
+  mkdir -p "$SHARED_DIR" 2>/dev/null || true
+  if mkdir -p "$shared_p" 2>/dev/null && touch "$shared_p/.canditech_write_test" 2>/dev/null; then
+    rm -f "$shared_p/.canditech_write_test"
+    echo "$shared_p"
+    return 0
+  fi
+  mkdir -p "${HOME}/miniconda3" 2>/dev/null || true
+  echo "${HOME}/miniconda3"
 }
 
 track_step() {
@@ -135,13 +178,23 @@ else
   die "Unsupported OS: $OS"
 fi
 
+MINICONDA_PREFIX="$(pick_miniconda_prefix)"
+MINICONDA_LOG="$(dirname "$MINICONDA_PREFIX")/miniconda-install.log"
+if [[ "$MINICONDA_PREFIX" == "${HOME}/miniconda3" ]]; then
+  info "Using install prefix under HOME (cannot write to ${SHARED_DIR}/miniconda3): ${MINICONDA_PREFIX}"
+fi
+
 track_step "step_5"
 MINICONDA_FALLBACK_URL="${MINICONDA_URL/https:\/\/repo.anaconda.com\/miniconda/https:\/\/repo.continuum.io\/miniconda}"
-download_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL"
+download_miniconda_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL"
+
+# The .sh file is a self-extracting installer (not a separate .tar to unpack). Extraction happens when bash runs it below.
+chmod +x "$MINICONDA_SH" 2>/dev/null || true
+info "Miniconda installer downloaded; extracting and installing into ${MINICONDA_PREFIX}…"
 
 track_step "step_6"
 : >"$MINICONDA_LOG"
-if ! head -n 1 "$MINICONDA_SH" | grep -q '^#!'; then
+if ! LC_ALL=C head -n 1 "$MINICONDA_SH" | LC_ALL=C grep -q '^#!'; then
   die "Miniconda installer file is invalid (not a shell script). Re-download or check network / mirror."
 fi
 # Fresh install: -b -p. Update existing prefix only when conda is already there (-u can confuse a broken/partial tree).
@@ -149,14 +202,33 @@ MINICONDA_INSTALL_ARGS=(-b -p "$MINICONDA_PREFIX")
 if [[ -d "$MINICONDA_PREFIX/conda-meta" ]] || [[ -x "$MINICONDA_PREFIX/bin/conda" ]]; then
   MINICONDA_INSTALL_ARGS=(-b -u -p "$MINICONDA_PREFIX")
 fi
-if ! bash "$MINICONDA_SH" "${MINICONDA_INSTALL_ARGS[@]}" >>"$MINICONDA_LOG" 2>&1; then
-  err "Miniconda install failed. Last lines of ${MINICONDA_LOG}:"
-  tail -n 80 "$MINICONDA_LOG" >&2 || true
-  die "Miniconda installer exited with an error."
+run_install() {
+  bash "$MINICONDA_SH" "$@" >>"$MINICONDA_LOG" 2>&1
+}
+if ! run_install "${MINICONDA_INSTALL_ARGS[@]}"; then
+  err "First Miniconda install attempt failed; retrying with --force (-f). Log tail:"
+  tail -n 40 "$MINICONDA_LOG" >&2 || true
+  if [[ " ${MINICONDA_INSTALL_ARGS[*]} " == *" -u "* ]]; then
+    MINICONDA_INSTALL_ARGS=(-b -u -f -p "$MINICONDA_PREFIX")
+  else
+    MINICONDA_INSTALL_ARGS=(-b -f -p "$MINICONDA_PREFIX")
+  fi
+  if ! run_install "${MINICONDA_INSTALL_ARGS[@]}"; then
+    err "Miniconda install failed after retry. Last lines of ${MINICONDA_LOG}:"
+    tail -n 80 "$MINICONDA_LOG" >&2 || true
+    die "Miniconda installer exited with an error."
+  fi
 fi
 
 track_step "step_7"
-"$MINICONDA_PREFIX/bin/python3" -V >/dev/null 2>&1 || die "Miniconda python verification failed."
+MINICONDA_PY=""
+if [[ -x "$MINICONDA_PREFIX/bin/python3" ]]; then
+  MINICONDA_PY="$MINICONDA_PREFIX/bin/python3"
+elif [[ -x "$MINICONDA_PREFIX/bin/python" ]]; then
+  MINICONDA_PY="$MINICONDA_PREFIX/bin/python"
+fi
+[[ -n "$MINICONDA_PY" ]] || die "Miniconda python not found under ${MINICONDA_PREFIX}/bin."
+"$MINICONDA_PY" -V >/dev/null 2>&1 || die "Miniconda python verification failed."
 rm -f "$MINICONDA_SH" "$ENV_SETUP_JS" "$ENV_SETUP_LOG"
 
 track_step "step_8"
