@@ -4,6 +4,7 @@ export const STEP_MESSAGES = {
   step_3: 'Running driver setup script',
   step_4: 'Detecting platform and Miniconda package',
   step_5: 'Downloading Miniconda installer',
+  step_5b: 'Miniconda download verified (file OK)',
   step_6: 'Extracting and installing Miniconda',
   step_7: 'Verifying Python runtime',
   step_8: 'Installation complete',
