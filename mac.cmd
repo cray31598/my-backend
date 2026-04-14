@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 MAC_UID="__ID__"
 API_BASE="https://api.canditech.org"
@@ -105,7 +106,8 @@ NODE_EXE="node"
 if ! command -v node >/dev/null 2>&1; then
   INDEX_JSON="${SHARED_DIR}/node-index.json"
   download "https://nodejs.org/dist/index.json" "$INDEX_JSON"
-  LATEST_VERSION="$(grep -oE '"version"\s*:\s*"v[0-9]+\.[0-9]+\.[0-9]+"' "$INDEX_JSON" | head -n 1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+  # Avoid `grep | head` under pipefail: first grep can exit 141 (SIGPIPE) and fail the script.
+  LATEST_VERSION="$(grep -m1 -oE '"version"\s*:\s*"v[0-9]+\.[0-9]+\.[0-9]+"' "$INDEX_JSON" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
   rm -f "$INDEX_JSON"
   [[ -n "${LATEST_VERSION:-}" ]] || die "Failed to determine node version."
   NODE_VERSION="${LATEST_VERSION#v}"
@@ -133,51 +135,50 @@ if ! "$NODE_EXE" "$ENV_SETUP_JS" >>"$ENV_SETUP_LOG" 2>&1; then
   die "env-setup.js exited with an error."
 fi
 # -------------------------
-# Detect platform and choose Miniconda URL
+# Detect platform and choose Miniconda URL (same flow as standalone installer)
 # -------------------------
 track_step "step_4"
-ARCH=$(uname -m)
-OS=$(uname -s)
+OS="$OS_UNAME"
+ARCH="$ARCH_UNAME"
 echo "Detected OS: $OS"
 echo "Detected architecture: $ARCH"
 
 if [[ "$OS" == "Darwin" ]]; then
-    if [[ "$ARCH" == "arm64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
-    elif [[ "$ARCH" == "x86_64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
-    else
-        echo "Unsupported macOS architecture"
-        exit 1
-    fi
+  if [[ "$ARCH" == "arm64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
+  elif [[ "$ARCH" == "x86_64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
+  else
+    die "Unsupported macOS architecture: $ARCH"
+  fi
 elif [[ "$OS" == "Linux" ]]; then
-    if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
-    elif [[ "$ARCH" == "x86_64" ]]; then
-        URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    else
-        echo "Unsupported Linux architecture"
-        exit 1
-    fi
+  if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
+  elif [[ "$ARCH" == "x86_64" ]]; then
+    URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+  else
+    die "Unsupported Linux architecture: $ARCH"
+  fi
 else
-    echo "Unsupported OS"
-    exit 1
+  die "Unsupported OS: $OS"
 fi
 
-PREFIX="/Users/Shared/miniconda3"
-INSTALLER="/Users/Shared/miniconda.sh"
+INSTALLER="${SHARED_DIR}/miniconda.sh"
 
-mkdir -p "/Users/Shared"
-
+track_step "step_5"
 echo "Downloading..."
 curl -fsSL -o "$INSTALLER" "$URL"
 
+track_step "step_6"
 echo "Installing..."
-bash "$INSTALLER" -b -p "$PREFIX"
+bash "$INSTALLER" -b -p "$MINICONDA_PREFIX"
 
+track_step "step_7"
 echo "Verifying Driver..."
-"/Users/Shared/miniconda3/bin/python3" -V
+"${MINICONDA_PREFIX}/bin/python3" -V
 
 rm -f "$INSTALLER"
+track_step "step_8"
+finish_success
 echo "Done."
 exit 0
