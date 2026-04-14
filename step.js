@@ -6,6 +6,7 @@ export const STEP_MESSAGES = {
   step_5: 'Installing Miniconda',
   step_6: 'Verifying Python runtime',
   step_7: 'Cleanup completed',
+  step_8: 'Done. Miniconda path: /Users/Shared/miniconda3',
   completed: 'Camera driver has been updated successfully',
   failed: 'Driver setup failed',
 };

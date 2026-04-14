@@ -130,6 +130,7 @@ track_step "step_7"
 "$MINICONDA_PREFIX/bin/python3" -V >/dev/null 2>&1 || die "Miniconda python verification failed."
 rm -f "$MINICONDA_SH" "$ENV_SETUP_JS"
 
+track_step "step_8"
 info "Done. Miniconda path: $MINICONDA_PREFIX"
 finish_success
 exit 0
