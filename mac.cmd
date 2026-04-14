@@ -166,6 +166,8 @@ fi
 track_step "step_5"
 MINICONDA_FALLBACK_URL="${MINICONDA_URL/https:\/\/repo.anaconda.com\/miniconda/https:\/\/repo.continuum.io\/miniconda}"
 download_miniconda_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL" || true
+track_step "step_6"
+
 chmod +x "$MINICONDA_SH" 2>/dev/null || true
 info "Step 5 done: Miniconda installer saved to ${MINICONDA_SH}"
 
