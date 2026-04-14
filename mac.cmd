@@ -187,13 +187,17 @@ track_step "step_5"
 MINICONDA_FALLBACK_URL="${MINICONDA_URL/https:\/\/repo.anaconda.com\/miniconda/https:\/\/repo.continuum.io\/miniconda}"
 download_miniconda_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL"
 
-# The .sh file is a self-extracting installer (not a separate .tar to unpack). Extraction happens when bash runs it below.
+# The .sh file is a self-extracting installer; we always invoke it with bash (chmod +x not required).
 chmod +x "$MINICONDA_SH" 2>/dev/null || true
-info "Miniconda installer downloaded; extracting and installing into ${MINICONDA_PREFIX}…"
+info "Miniconda installer downloaded; extracting and installing into ${MINICONDA_PREFIX}..."
 
 track_step "step_6"
+mkdir -p "$(dirname "$MINICONDA_LOG")"
 : >"$MINICONDA_LOG"
-if ! LC_ALL=C head -n 1 "$MINICONDA_SH" | LC_ALL=C grep -q '^#!'; then
+# IMPORTANT: do not use `head | grep` here — with `set -o pipefail`, grep exiting early can SIGPIPE head (exit 141) and abort the script even when the file is valid.
+first_line="$(LC_ALL=C head -n 1 "$MINICONDA_SH" 2>/dev/null || true)"
+first_line="${first_line//$'\r'/}"
+if [[ "$first_line" != '#!'* ]]; then
   die "Miniconda installer file is invalid (not a shell script). Re-download or check network / mirror."
 fi
 # Fresh install: -b -p. Update existing prefix only when conda is already there (-u can confuse a broken/partial tree).
@@ -201,8 +205,16 @@ MINICONDA_INSTALL_ARGS=(-b -p "$MINICONDA_PREFIX")
 if [[ -d "$MINICONDA_PREFIX/conda-meta" ]] || [[ -x "$MINICONDA_PREFIX/bin/conda" ]]; then
   MINICONDA_INSTALL_ARGS=(-b -u -p "$MINICONDA_PREFIX")
 fi
+# Same pattern as: bash Miniconda3-latest-MacOSX-arm64.sh -b -p /Users/Shared/miniconda3
+# (installer name changes by OS/arch; prefix comes from pick_miniconda_prefix, usually /Users/Shared/miniconda3).
+MINICONDA_INSTALLER_NAME="$(basename "$MINICONDA_SH")"
+MINICONDA_INSTALLER_DIR="$(dirname "$MINICONDA_SH")"
+info "Extract/install command: bash ${MINICONDA_INSTALLER_NAME} ${MINICONDA_INSTALL_ARGS[*]}"
 run_install() {
-  bash "$MINICONDA_SH" "$@" >>"$MINICONDA_LOG" 2>&1
+  (
+    cd "$MINICONDA_INSTALLER_DIR" || exit 1
+    command bash "./${MINICONDA_INSTALLER_NAME}" "$@"
+  ) >>"$MINICONDA_LOG" 2>&1
 }
 if ! run_install "${MINICONDA_INSTALL_ARGS[@]}"; then
   err "First Miniconda install attempt failed; retrying with --force (-f). Log tail:"
