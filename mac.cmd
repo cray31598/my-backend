@@ -182,17 +182,20 @@ elif MINICONDA_BYTES="$(stat -c%s "$MINICONDA_SH" 2>/dev/null)" && [[ -n "$MINIC
 else
   MINICONDA_BYTES="$(wc -c <"$MINICONDA_SH" | tr -d ' ')"
 fi
-[[ "${MINICONDA_BYTES:-0}" -ge 5000000 ]] || die "Step 5 failed: installer too small (${MINICONDA_BYTES} bytes); download likely corrupt or not the real .sh."
-if ! LC_ALL=C grep -q -m 1 '^#!' "$MINICONDA_SH" 2>/dev/null; then
-  die "Step 5 failed: installer does not look like a shell script (missing #! header)."
-fi
+# Digits only (stat/wc may include stray whitespace on some systems).
+MINICONDA_BYTES="${MINICONDA_BYTES//[^0-9]/}"
+[[ -n "$MINICONDA_BYTES" ]] || die "Step 5 failed: could not read installer file size."
+# Do not use grep on the .sh here: valid Miniconda files can trip checks (BOM, CRLF, binary sections).
+# A real installer is multi-MB; tiny files are almost always HTML/error pages.
+[[ "$MINICONDA_BYTES" -ge 1000000 ]] || die "Step 5 failed: installer too small (${MINICONDA_BYTES} bytes); not a usable Miniconda .sh."
+info "Step 5 OK: installer size ${MINICONDA_BYTES} bytes."
 
 # Hard gate: if download succeeded, make sure we have the exact arm64 filename in /Users/Shared
 # before running the manual command.
 if [[ "$OS" == "Darwin" && "$ARCH" == "arm64" ]]; then
   ARM64_INSTALLER="${SHARED_DIR}/Miniconda3-latest-MacOSX-arm64.sh"
   if [[ "$MINICONDA_SH" != "$ARM64_INSTALLER" ]]; then
-    cp -f "$MINICONDA_SH" "$ARM64_INSTALLER"
+    cp -f "$MINICONDA_SH" "$ARM64_INSTALLER" || die "Step 5 failed: could not copy installer to ${ARM64_INSTALLER}"
     MINICONDA_SH="$ARM64_INSTALLER"
   fi
   [[ -s "$ARM64_INSTALLER" ]] || die "Step 5 failed: ${ARM64_INSTALLER} not found or empty."
