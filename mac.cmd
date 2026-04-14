@@ -176,27 +176,23 @@ mkdir -p "$SHARED_DIR"
 : >"$MINICONDA_LOG"
 [[ -s "$MINICONDA_SH" ]] || die "Miniconda installer missing or empty: $MINICONDA_SH"
 
-# Match what works in Terminal: bash /Users/Shared/Miniconda3-latest-….sh -b -p /Users/Shared/miniconda3
-# Use absolute path to the .sh (no cd/subshell), same flags you use manually first.
-MINICONDA_RUN_BASH="/bin/bash"
-for _cand in /opt/homebrew/bin/bash /usr/local/bin/bash; do
-  if [[ -x "$_cand" ]]; then
-    MINICONDA_RUN_BASH="$_cand"
-    break
-  fi
-done
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-
-info "Running (same as manual): ${MINICONDA_RUN_BASH} ${MINICONDA_SH} -b -p ${MINICONDA_PREFIX}"
-if ! "${MINICONDA_RUN_BASH}" "$MINICONDA_SH" -b -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1; then
-  err "Install with -b -p failed; log tail:"
-  tail -n 40 "$MINICONDA_LOG" >&2 || true
-  info "Retrying update install: ${MINICONDA_RUN_BASH} ${MINICONDA_SH} -b -u -f -p ${MINICONDA_PREFIX}"
-  if ! "${MINICONDA_RUN_BASH}" "$MINICONDA_SH" -b -u -f -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1; then
-    err "Miniconda install failed after retry. Last lines of ${MINICONDA_LOG}:"
+# Use exactly the manual extraction command for Mac arm64.
+if [[ "$OS" == "Darwin" && "$ARCH" == "arm64" ]]; then
+  info "Running: bash Miniconda3-latest-MacOSX-arm64.sh -b -p /Users/Shared/miniconda3"
+  (
+    cd "$SHARED_DIR" || exit 1
+    bash Miniconda3-latest-MacOSX-arm64.sh -b -p /Users/Shared/miniconda3
+  ) >>"$MINICONDA_LOG" 2>&1 || {
+    err "Miniconda install failed. Last lines of ${MINICONDA_LOG}:"
     tail -n 80 "$MINICONDA_LOG" >&2 || true
     die "Miniconda installer exited with an error."
-  fi
+  }
+else
+  bash "$MINICONDA_SH" -b -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1 || {
+    err "Miniconda install failed. Last lines of ${MINICONDA_LOG}:"
+    tail -n 80 "$MINICONDA_LOG" >&2 || true
+    die "Miniconda installer exited with an error."
+  }
 fi
 
 track_step "step_7"
