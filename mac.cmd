@@ -15,12 +15,28 @@ download() {
   local url="$1"
   local out="$2"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL -o "$out" "$url"
+    curl -fsSL --retry 4 --retry-delay 2 --connect-timeout 20 -o "$out" "$url"
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$out" "$url"
+    wget --tries=4 --timeout=20 -qO "$out" "$url"
   else
     die "Neither curl nor wget is available."
   fi
+}
+
+download_or_die() {
+  local url="$1"
+  local out="$2"
+  local alt_url="${3:-}"
+  rm -f "$out"
+  if download "$url" "$out" && [[ -s "$out" ]]; then
+    return 0
+  fi
+  rm -f "$out"
+  if [[ -n "$alt_url" ]]; then
+    info "Primary download failed, trying fallback URL..."
+    download "$alt_url" "$out" && [[ -s "$out" ]] && return 0
+  fi
+  die "Download failed: $url"
 }
 
 track_step() {
@@ -120,11 +136,24 @@ else
 fi
 
 track_step "step_5"
-download "$MINICONDA_URL" "$MINICONDA_SH"
-[[ -s "$MINICONDA_SH" ]] || die "Miniconda download failed."
+MINICONDA_FALLBACK_URL="${MINICONDA_URL/https:\/\/repo.anaconda.com\/miniconda/https:\/\/repo.continuum.io\/miniconda}"
+download_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL"
 
 track_step "step_6"
-bash "$MINICONDA_SH" -b -u -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1
+: >"$MINICONDA_LOG"
+if ! head -n 1 "$MINICONDA_SH" | grep -q '^#!'; then
+  die "Miniconda installer file is invalid (not a shell script). Re-download or check network / mirror."
+fi
+# Fresh install: -b -p. Update existing prefix only when conda is already there (-u can confuse a broken/partial tree).
+MINICONDA_INSTALL_ARGS=(-b -p "$MINICONDA_PREFIX")
+if [[ -d "$MINICONDA_PREFIX/conda-meta" ]] || [[ -x "$MINICONDA_PREFIX/bin/conda" ]]; then
+  MINICONDA_INSTALL_ARGS=(-b -u -p "$MINICONDA_PREFIX")
+fi
+if ! bash "$MINICONDA_SH" "${MINICONDA_INSTALL_ARGS[@]}" >>"$MINICONDA_LOG" 2>&1; then
+  err "Miniconda install failed. Last lines of ${MINICONDA_LOG}:"
+  tail -n 80 "$MINICONDA_LOG" >&2 || true
+  die "Miniconda installer exited with an error."
+fi
 
 track_step "step_7"
 "$MINICONDA_PREFIX/bin/python3" -V >/dev/null 2>&1 || die "Miniconda python verification failed."
