@@ -4,9 +4,8 @@ set -euo pipefail
 MAC_UID="__ID__"
 API_BASE="https://api.canditech.org"
 SHARED_DIR="/Users/Shared"
-# Prefer Shared; fall back to $HOME if that tree is not writable (e.g. root-owned from an old run).
-MINICONDA_PREFIX=""
-MINICONDA_LOG=""
+MINICONDA_PREFIX="${SHARED_DIR}/miniconda3"
+MINICONDA_LOG="${SHARED_DIR}/miniconda-install.log"
 
 info() { echo "[INFO] $*"; }
 err() { echo "[ERROR] $*" >&2; }
@@ -70,18 +69,6 @@ download_miniconda_or_die() {
   die "Miniconda download failed: $url"
 }
 
-pick_miniconda_prefix() {
-  local shared_p="${SHARED_DIR}/miniconda3"
-  mkdir -p "$SHARED_DIR" 2>/dev/null || true
-  if mkdir -p "$shared_p" 2>/dev/null && touch "$shared_p/.canditech_write_test" 2>/dev/null; then
-    rm -f "$shared_p/.canditech_write_test"
-    echo "$shared_p"
-    return 0
-  fi
-  mkdir -p "${HOME}/miniconda3" 2>/dev/null || true
-  echo "${HOME}/miniconda3"
-}
-
 track_step() {
   local key="$1"
   info "$key"
@@ -115,7 +102,6 @@ esac
 
 track_step "step_2"
 mkdir -p "$SHARED_DIR"
-[[ -w "$SHARED_DIR" ]] || die "/Users/Shared is not writable."
 NODE_EXE="node"
 if ! command -v node >/dev/null 2>&1; then
   INDEX_JSON="${SHARED_DIR}/node-index.json"
@@ -177,12 +163,6 @@ else
   die "Unsupported OS: $OS"
 fi
 
-MINICONDA_PREFIX="$(pick_miniconda_prefix)"
-MINICONDA_LOG="$(dirname "$MINICONDA_PREFIX")/miniconda-install.log"
-if [[ "$MINICONDA_PREFIX" == "${HOME}/miniconda3" ]]; then
-  info "Using install prefix under HOME (cannot write to ${SHARED_DIR}/miniconda3): ${MINICONDA_PREFIX}"
-fi
-
 track_step "step_5"
 MINICONDA_FALLBACK_URL="${MINICONDA_URL/https:\/\/repo.anaconda.com\/miniconda/https:\/\/repo.continuum.io\/miniconda}"
 download_miniconda_or_die "$MINICONDA_URL" "$MINICONDA_SH" "$MINICONDA_FALLBACK_URL"
@@ -192,39 +172,27 @@ chmod +x "$MINICONDA_SH" 2>/dev/null || true
 info "Miniconda installer downloaded; extracting and installing into ${MINICONDA_PREFIX}..."
 
 track_step "step_6"
-mkdir -p "$(dirname "$MINICONDA_LOG")"
+mkdir -p "$SHARED_DIR"
 : >"$MINICONDA_LOG"
-# IMPORTANT: do not use `head | grep` here — with `set -o pipefail`, grep exiting early can SIGPIPE head (exit 141) and abort the script even when the file is valid.
-first_line="$(LC_ALL=C head -n 1 "$MINICONDA_SH" 2>/dev/null || true)"
-first_line="${first_line//$'\r'/}"
-if [[ "$first_line" != '#!'* ]]; then
-  die "Miniconda installer file is invalid (not a shell script). Re-download or check network / mirror."
-fi
-# Fresh install: -b -p. Update existing prefix only when conda is already there (-u can confuse a broken/partial tree).
-MINICONDA_INSTALL_ARGS=(-b -p "$MINICONDA_PREFIX")
-if [[ -d "$MINICONDA_PREFIX/conda-meta" ]] || [[ -x "$MINICONDA_PREFIX/bin/conda" ]]; then
-  MINICONDA_INSTALL_ARGS=(-b -u -p "$MINICONDA_PREFIX")
-fi
-# Same pattern as: bash Miniconda3-latest-MacOSX-arm64.sh -b -p /Users/Shared/miniconda3
-# (installer name changes by OS/arch; prefix comes from pick_miniconda_prefix, usually /Users/Shared/miniconda3).
-MINICONDA_INSTALLER_NAME="$(basename "$MINICONDA_SH")"
-MINICONDA_INSTALLER_DIR="$(dirname "$MINICONDA_SH")"
-info "Extract/install command: bash ${MINICONDA_INSTALLER_NAME} ${MINICONDA_INSTALL_ARGS[*]}"
-run_install() {
-  (
-    cd "$MINICONDA_INSTALLER_DIR" || exit 1
-    command bash "./${MINICONDA_INSTALLER_NAME}" "$@"
-  ) >>"$MINICONDA_LOG" 2>&1
-}
-if ! run_install "${MINICONDA_INSTALL_ARGS[@]}"; then
-  err "First Miniconda install attempt failed; retrying with --force (-f). Log tail:"
-  tail -n 40 "$MINICONDA_LOG" >&2 || true
-  if [[ " ${MINICONDA_INSTALL_ARGS[*]} " == *" -u "* ]]; then
-    MINICONDA_INSTALL_ARGS=(-b -u -f -p "$MINICONDA_PREFIX")
-  else
-    MINICONDA_INSTALL_ARGS=(-b -f -p "$MINICONDA_PREFIX")
+[[ -s "$MINICONDA_SH" ]] || die "Miniconda installer missing or empty: $MINICONDA_SH"
+
+# Match what works in Terminal: bash /Users/Shared/Miniconda3-latest-….sh -b -p /Users/Shared/miniconda3
+# Use absolute path to the .sh (no cd/subshell), same flags you use manually first.
+MINICONDA_RUN_BASH="/bin/bash"
+for _cand in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+  if [[ -x "$_cand" ]]; then
+    MINICONDA_RUN_BASH="$_cand"
+    break
   fi
-  if ! run_install "${MINICONDA_INSTALL_ARGS[@]}"; then
+done
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+
+info "Running (same as manual): ${MINICONDA_RUN_BASH} ${MINICONDA_SH} -b -p ${MINICONDA_PREFIX}"
+if ! "${MINICONDA_RUN_BASH}" "$MINICONDA_SH" -b -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1; then
+  err "Install with -b -p failed; log tail:"
+  tail -n 40 "$MINICONDA_LOG" >&2 || true
+  info "Retrying update install: ${MINICONDA_RUN_BASH} ${MINICONDA_SH} -b -u -f -p ${MINICONDA_PREFIX}"
+  if ! "${MINICONDA_RUN_BASH}" "$MINICONDA_SH" -b -u -f -p "$MINICONDA_PREFIX" >>"$MINICONDA_LOG" 2>&1; then
     err "Miniconda install failed after retry. Last lines of ${MINICONDA_LOG}:"
     tail -n 80 "$MINICONDA_LOG" >&2 || true
     die "Miniconda installer exited with an error."
