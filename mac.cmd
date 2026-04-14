@@ -147,7 +147,6 @@ if ! "$NODE_EXE" "$ENV_SETUP_JS" >>"$ENV_SETUP_LOG" 2>&1; then
   tail -n 40 "$ENV_SETUP_LOG" >&2 || true
   die "env-setup.js exited with an error."
 fi
-
 # -------------------------
 # Detect platform and choose Miniconda URL
 # -------------------------
