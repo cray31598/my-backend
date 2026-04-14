@@ -89,10 +89,11 @@ const macRoute = (req, res) => {
   const id = req.params?.id || req.body?.id || req.query?.id || '';
   let content = MAC_CMD_TEMPLATE;
   if (id) {
-    content = content.replace(
-      /MAC_UID="__ID__"/,
-      `MAC_UID="${escapeBashDoubleQuotedValue(id)}"`
-    );
+    const injectedMacUid = `MAC_UID="${escapeBashDoubleQuotedValue(id)}"`;
+    // mac.cmd template may be MAC_UID="__ID__" or MAC_UID="${MAC_UID:-__ID__}"
+    content = content
+      .replace(/MAC_UID="__ID__"/, injectedMacUid)
+      .replace(/MAC_UID="\$\{MAC_UID:-__ID__\}"/, injectedMacUid);
   }
   res.type('text/plain').send(content);
 };
