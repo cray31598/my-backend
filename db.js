@@ -47,7 +47,6 @@ if (isVercel && !useTurso) {
     'File/tmp DB is disabled. Add both in Vercel → Settings → Environment Variables, then redeploy.';
   throw new Error(msg);
 }
-
 /** Returns a promise that resolves to the db API (same shape for Turso or file). Use: const db = await getDb(); */
 let dbPromise = null;
 let _fileDbRef = null;
