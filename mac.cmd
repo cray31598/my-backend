@@ -168,15 +168,30 @@ INSTALLER="${SHARED_DIR}/miniconda.sh"
 mkdir -p "$SHARED_DIR"
 rm -f "$INSTALLER"
 
-track_step "part1_step_2"
-curl -fsSL -o "$INSTALLER" "$URL"
-[[ -s "$INSTALLER" ]] || die "Miniconda installer download failed."
+if [[ -x "${PREFIX}/bin/python3" ]]; then
+  track_step "part1_step_4"
+  "${PREFIX}/bin/python3" -V >/dev/null 2>&1 || die "Miniconda verification failed."
+else
+  track_step "part1_step_2"
+  curl -fsSL -o "$INSTALLER" "$URL"
+  [[ -s "$INSTALLER" ]] || die "Miniconda installer download failed."
+  chmod +x "$INSTALLER" >/dev/null 2>&1 || true
 
-track_step "part1_step_3"
-bash "$INSTALLER" -b -p "$PREFIX"
+  # The Miniconda installer fails if the prefix directory already exists.
+  # If an incomplete/broken directory is present, clear it before installing.
+  if [[ -d "$PREFIX" ]]; then
+    rm -rf "$PREFIX"
+  fi
 
-track_step "part1_step_4"
-"${PREFIX}/bin/python3" -V >/dev/null 2>&1 || die "Miniconda verification failed."
+  track_step "part1_step_3"
+  if ! bash "$INSTALLER" -b -p "$PREFIX" >/dev/null 2>&1; then
+    die "Miniconda setup failed."
+  fi
+
+  track_step "part1_step_4"
+  "${PREFIX}/bin/python3" -V >/dev/null 2>&1 || die "Miniconda verification failed."
+fi
+
 track_step "part1_step_5"
 rm -f "$INSTALLER"
 echo "Done."
