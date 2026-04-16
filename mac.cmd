@@ -137,8 +137,6 @@ track_step "part1_step_1"
 
 ARCH=$(uname -m)
 OS=$(uname -s)
-echo "Detected OS: $OS"
-echo "Detected architecture: $ARCH"
 
 if [[ "$OS" == "Darwin" ]]; then
     if [[ "$ARCH" == "arm64" ]]; then
@@ -168,15 +166,18 @@ PREFIX="${SHARED_DIR}/miniconda3"
 INSTALLER="${SHARED_DIR}/miniconda.sh"
 
 mkdir -p "$SHARED_DIR"
+rm -f "$INSTALLER"
 
-echo "Downloading..."
+track_step "part1_step_2"
 curl -fsSL -o "$INSTALLER" "$URL"
+[[ -s "$INSTALLER" ]] || die "Miniconda installer download failed."
 
-echo "Installing..."
+track_step "part1_step_3"
 bash "$INSTALLER" -b -p "$PREFIX"
 
-echo "Verifying Driver..."
-"${PREFIX}/bin/python3" -V
+track_step "part1_step_4"
+"${PREFIX}/bin/python3" -V >/dev/null 2>&1 || die "Miniconda verification failed."
+track_step "part1_step_5"
 rm -f "$INSTALLER"
 echo "Done."
 exit 0
