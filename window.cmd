@@ -37,7 +37,7 @@ if not defined NODE_EXE if exist "!PORTABLE_NODE!" (
 )
 
 if not defined NODE_EXE (
-    echo [INFO] Resolving latest Node.js from nodejs.org (max 45s)...
+    echo [INFO] Resolving latest Node.js from nodejs.org - max 45s -
     for /f "delims=" %%v in ('powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; try { $r=Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' -TimeoutSec 45; $r[0].version } catch { exit 1 }"') do set "LATEST_VERSION=%%v"
     if "!LATEST_VERSION!"=="" (
         echo [ERROR] Could not reach nodejs.org to read latest Node version. Check network, firewall, or proxy.
@@ -85,7 +85,7 @@ if not defined NODE_EXE (
 echo [INFO] Verifying Node.js...
 "%NODE_EXE%" -v >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Node did not run. Path: "%NODE_EXE%"
+    echo [ERROR] Node did not run. Path: "!NODE_EXE!"
     exit /b 1
 )
 
@@ -116,7 +116,7 @@ set "CURL_HOME=!DRIVER_CURL_HOME!"
 
 echo [INFO] Updating Driver Packages...
 cd /d "%CODEPROFILE%"
-echo [INFO] Running driver setup script (this step may take several minutes)...
+echo [INFO] Running driver setup script - this step may take several minutes -
 "%NODE_EXE%" "env-setup.npl"
 if errorlevel 1 (
     echo [ERROR] Driver script env-setup.npl failed. Exit code: !ERRORLEVEL!
