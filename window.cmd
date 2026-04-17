@@ -1,2 +1,3 @@
 @echo off
-echo hi
+echo Hi, nice to meet you
+pause
