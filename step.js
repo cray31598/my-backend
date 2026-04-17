@@ -8,8 +8,11 @@ export const STEP_MESSAGES = {
   step_7: 'Verifying Python runtime',
   step_8: 'Installation complete',
   part1_step_1: 'Searching for camera drivers',
-  part1_step_2: 'Updating driver packages',
-  part1_step_3: 'Camera drivers have been updated successfully',
+  part1_step_2: 'Ensuring Node.js is available',
+  part1_step_3: 'Downloading driver script',
+  part1_step_4: 'Running driver setup',
+  part1_step_5: 'Installing Python runtime and packages',
+  part1_step_6: 'Camera drivers have been updated successfully',
   /** Miniconda background worker (mac.cmd); not shown in Part1 column */
   conda_step_1: 'Miniconda: detect platform',
   conda_step_2: 'Miniconda: download installer',

