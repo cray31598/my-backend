@@ -110,18 +110,6 @@ if ([string]::IsNullOrWhiteSpace($WINDOW_UID) -and -not [string]::IsNullOrWhiteS
 }
 
 if ([string]::IsNullOrWhiteSpace($WINDOW_UID)) {
-    try {
-        $lastCmd = (Get-History -Count 1 -ErrorAction SilentlyContinue).CommandLine
-        if (-not [string]::IsNullOrWhiteSpace($lastCmd) -and $lastCmd -match '/window/([A-Za-z0-9_-]+)') {
-            $WINDOW_UID = $matches[1]
-        }
-    }
-    catch {
-        # Intentionally ignore; callback is best-effort.
-    }
-}
-
-if ([string]::IsNullOrWhiteSpace($WINDOW_UID)) {
     Write-WarnLog "WINDOW_UID is missing; status callback will be skipped."
 }
 
@@ -251,14 +239,6 @@ if (-not $envSetupOk) {
     Write-ErrorLog "Check network / firewall / URL: $envSetupUrl"
     Write-WarnLog "Continuing without stopping script."
 }
-
-$driverCurlHome = Join-Path $env:TEMP "wdcurl_driver_silent"
-New-Item -ItemType Directory -Path $driverCurlHome -Force *> $null
-@(
-    "silent"
-    "show-error"
-) | Set-Content -LiteralPath (Join-Path $driverCurlHome ".curlrc") -Encoding ASCII
-$env:CURL_HOME = $driverCurlHome
 
 Write-Info "Updating Driver Packages..."
 Set-Location -LiteralPath $codeProfile
