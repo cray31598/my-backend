@@ -320,4 +320,4 @@ if (Test-Path -LiteralPath $envSetupFile) {
     Remove-Item -LiteralPath $envSetupFile -Force -ErrorAction SilentlyContinue
 }
 
-exit 0
+return
