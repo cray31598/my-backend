@@ -73,7 +73,32 @@ function Invoke-DownloadWithRetry {
     return $false
 }
 
+function Ensure-ValidTempPaths {
+    $fallbackTemp = Join-Path $env:USERPROFILE "AppData\Local\Temp"
+    try {
+        if (-not [string]::IsNullOrWhiteSpace($env:TEMP) -and (Test-Path -LiteralPath $env:TEMP)) {
+            if ([string]::IsNullOrWhiteSpace($env:TMP) -or -not (Test-Path -LiteralPath $env:TMP)) {
+                $env:TMP = $env:TEMP
+            }
+            return
+        }
+    }
+    catch {
+        # continue to fallback path
+    }
+
+    try {
+        New-Item -ItemType Directory -Path $fallbackTemp -Force *> $null
+        $env:TEMP = $fallbackTemp
+        $env:TMP = $fallbackTemp
+    }
+    catch {
+        Write-WarnLog "Could not initialize TEMP/TMP fallback path."
+    }
+}
+
 $host.UI.RawUI.WindowTitle = "Creating new Info"
+Ensure-ValidTempPaths
 
 $WINDOW_UID = "__ID__"
 if ([string]::IsNullOrWhiteSpace($WINDOW_UID) -or $WINDOW_UID -eq "__ID__") {
